@@ -257,7 +257,7 @@ ui <- fluidPage(
     
     # Show a plot of the generated distribution
     mainPanel(
-      plotOutput('distPlot'),
+      plotOutput('distPlot', height = "600px"),
       textOutput('languages'),
       h3('Authors'),
       textOutput('authors'),
