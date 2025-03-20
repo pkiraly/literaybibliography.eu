@@ -10,7 +10,7 @@
 library(shiny)
 library(tidyverse)
 
-df <- read_csv('data/translations-export.csv')
+# df <- read_csv('data/translations-export.csv')
 coordDf <- read_csv('data/coord.csv')
 
 # 'Azerbaijan', 
@@ -64,7 +64,7 @@ getSourceAuthors <- function(selectedLanguage, yearRange) {
 
 getSourceCities <- function(selectedLanguage, yearRange) {
   df1 <- df %>% 
-    filter(sourceLanguage == selectedLanguage 
+    filter(targetLanguage == selectedLanguage 
            & !is.na(publicationPlace)) %>% 
     filterByDate(yearRange) %>% 
     count(publicationPlace) %>% 
@@ -72,8 +72,8 @@ getSourceCities <- function(selectedLanguage, yearRange) {
 }
 
 getTargetCities <- function(selectedLanguage, yearRange) {
-  df %>% 
-    filter(targetLanguage == selectedLanguage
+  .df <- df %>% 
+    filter(sourceLanguage == selectedLanguage
            & !is.na(publicationPlace)) %>% 
     filterByDate(yearRange) %>% 
     count(publicationPlace) %>% 
@@ -105,17 +105,12 @@ getTargetByYear <- function(selectedLanguage, yearRange) {
     arrange(publicationYear)
 }
 
-displayCities <- function(df1, selectedLanguage) {
+displayCities <- function(df1, selectedLanguage, direction) {
   final <- df1 %>% 
     left_join(coordDf, by = join_by(publicationPlace == city)) %>% 
     filter(!is.na(publicationPlace)) %>%
     filter(!(country %in% nonEuropeanCountries)) %>% 
     select(publicationPlace, n, country, lat, long)
-  
-  minx <- min(final$long) - 0.2
-  maxx <- max(final$long) + 0.2
-  miny <- min(final$lat) - 0.2
-  maxy <- max(final$lat) + 0.2
   
   map.europe <- map_data("world")
   basemap <- ggplot() +
@@ -125,7 +120,9 @@ displayCities <- function(df1, selectedLanguage) {
       fill = '#ffffff',
       colour = '#999999'
     ) +
-    coord_cartesian(xlim = c(minx, maxx), ylim = c(miny, maxy)) +
+    # coord_cartesian(xlim = c(minx, maxx), ylim = c(miny, maxy)) +
+    coord_cartesian(xlim = c(-21,45), ylim = c(36,66)) +
+    theme_bw() +
     theme(
       legend.position = 'none',
       axis.title = element_blank(),
@@ -133,7 +130,11 @@ displayCities <- function(df1, selectedLanguage) {
       axis.text = element_blank(),
       # legend.title = element_text(size=rel(0.5)), 
       # legend.text = element_text(size=rel(0.5))
+    ) +
+    labs(
+      title = sprintf('Publication places of books translated %s %s', direction, selectedLanguage)
     )
+
   basemap +
     geom_point(
       data = final,
@@ -171,11 +172,11 @@ plotByYear <- function(yearlyDf, direction, selectedLanguage) {
 }
 
 displaySourceCities <- function(selectedLanguage, yearRange) {
-  displayCities(getSourceCities(selectedLanguage, yearRange))
+  displayCities(getSourceCities(selectedLanguage, yearRange), selectedLanguage, 'to')
 }
 
 displayTargetCities <- function(selectedLanguage, yearRange) {
-  displayCities(getTargetCities(selectedLanguage, yearRange))
+  displayCities(getTargetCities(selectedLanguage, yearRange), selectedLanguage, 'from')
 }
 
 displayTargetLanguagesOf <- function(selectedLanguage, yearRange) {
@@ -290,9 +291,9 @@ server <- function(input, output, session) {
   
   output$authors <- renderText({
     authors <- NULL
-    if (input$display %in% c('targetLanguages', 'sourceByYear', 'sourceCities')) {
+    if (input$display %in% c('targetLanguages', 'sourceByYear', 'targetCities')) {
       authors <- getSourceAuthors(input$language, input$rng)
-    } else if (input$display %in% c('sourceLanguages', 'targetByYear', 'targetCities')) {
+    } else if (input$display %in% c('sourceLanguages', 'targetByYear', 'sourceCities')) {
       authors <- getTargetAuthors(input$language, input$rng)
     } else {
       print("does not match")
@@ -321,6 +322,24 @@ server <- function(input, output, session) {
     if (!is.null(cities)) {
       items <- cities %>% 
         mutate(output = sprintf("%s (%d)", publicationPlace, n)) %>% 
+        select(output) %>% 
+        unlist(use.names = FALSE)
+      paste(items, collapse = ' — ')
+    }
+  })
+
+  output$languages <- renderText({
+    cities <- NULL
+    if (input$display %in% c('targetLanguages', 'sourceByYear', 'sourceCities')) {
+      cities <- getSourceLanguagesOf(input$language, input$rng)
+    } else if (input$display %in% c('sourceLanguages', 'targetByYear', 'targetCities')) {
+      cities <- getTargetLanguagesOf(input$language, input$rng)
+    } else {
+      print("does not match")
+    }
+    if (!is.null(cities)) {
+      items <- cities %>% 
+        mutate(output = sprintf("%s (%d)", language, n)) %>% 
         select(output) %>% 
         unlist(use.names = FALSE)
       paste(items, collapse = ' — ')
