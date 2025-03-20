@@ -1,9 +1,10 @@
 <?php
 
 $input = '/home/pkiraly/data/marc21/output/elb/translations-export.jsonld';
-if (file_exists('translations-export.csv'))
-  unlink('translations-export.csv');
-file_put_contents('translations-export.csv', "author,publicationPlace,publicationYear,sourceLanguage,targetLanguage\n");
+$output = 'data/translations-export.csv';
+if (file_exists($output))
+  unlink($output);
+file_put_contents($output, "author,publicationPlace,publicationYear,sourceLanguage,targetLanguage\n");
 
 $handle = fopen($input, "r");
 if ($handle) {
@@ -18,7 +19,7 @@ if ($handle) {
       getFirst($record, 'sourceLanguage'),
       getFirst($record, 'targetLanguage'),
     );
-    file_put_contents('translations-export.csv', $csv, FILE_APPEND);
+    file_put_contents($output, $csv, FILE_APPEND);
   }
   fclose($handle);
 }

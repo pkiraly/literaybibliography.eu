@@ -10,7 +10,7 @@
 library(shiny)
 library(tidyverse)
 
-# df <- read_csv('data/translations-export.csv')
+df <- read_csv('data/translations-export.csv')
 coordDf <- read_csv('data/coord.csv')
 
 # 'Azerbaijan', 
@@ -18,6 +18,7 @@ nonEuropeanCountries <- c('Brazil', 'Canada', 'United States', 'Argentina', 'Aus
 
 languages <- df %>% count(sourceLanguage) %>% 
   arrange(desc(n)) %>% select(sourceLanguage) %>% unlist(use.names = FALSE)
+print(languages)
 
 publicationYears <- df %>% select(publicationYear) %>% 
   filter(!is.na(publicationYear)) %>% distinct(publicationYear) %>% 
@@ -246,8 +247,8 @@ ui <- fluidPage(
           'as source by year' = 'sourceByYear',
           'as target by year' = 'targetByYear',
           'translations to and from by year' = 'both',
-          'translated from where?' = 'sourceCities',
-          'translated to where?' = 'targetCities'
+          'publication places of translations to' = 'sourceCities',
+          'publication places of translations from' = 'targetCities'
         )
       ),
       numericInput("authorCount", "The number of authors to display",
