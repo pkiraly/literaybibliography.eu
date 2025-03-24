@@ -10,215 +10,20 @@
 library(shiny)
 library(tidyverse)
 
-df <- read_csv('data/translations-export.csv')
-coordDf <- read_csv('data/coord.csv')
+if (file.exists('data/directory.csv')) {
+  directoryDf <- read_csv('data/directory.csv', show_col_types = FALSE)
+} else {
+  directoryDf <- NULL
+}
+dfDefault <- read_csv('data/translations-export.csv', show_col_types = FALSE)
+coordDf <- read_csv('data/coord.csv', show_col_types = FALSE)
 
 # 'Azerbaijan', 
 nonEuropeanCountries <- c('Brazil', 'Canada', 'United States', 'Argentina', 'Australia', 'China', 'Colombia', 'Costa Rica', 'Cuba', 'India', 'Indonesia', 'Iran', 'Iraq', 'Israel', 'Japan', 'Lebanon', 'Malaysia', 'Mexico', 'New Zealand', 'Nicaragua', 'Singapore', 'South Korea', 'Tanzania', 'Vietnam')
 
-languages <- df %>% count(sourceLanguage) %>% 
-  arrange(desc(n)) %>% select(sourceLanguage) %>% unlist(use.names = FALSE)
-print(languages)
-
-publicationYears <- df %>% select(publicationYear) %>% 
-  filter(!is.na(publicationYear)) %>% distinct(publicationYear) %>% 
-  arrange(publicationYear) %>% unlist(use.name = FALSE)
-
-#' Functions ----
-filterByDate <- function(.df, yearRange) {
-  if (   min(publicationYears) < yearRange[1]
-         || max(publicationYears) > yearRange[1]) {
-    .df <- .df %>% 
-      filter(  !is.na(publicationYear) 
-               & publicationYear >= yearRange[1] 
-               & publicationYear <= yearRange[2])
-  }
-  .df
-}
-
-# get data
-getSourceLanguagesOf <- function(selectedLanguage, yearRange) {
-  df %>% 
-    filter(targetLanguage == selectedLanguage & !is.na(sourceLanguage)) %>% 
-    filterByDate(yearRange) %>% 
-    count(sourceLanguage) %>% 
-    rename(language = sourceLanguage) %>% 
-    arrange(desc(n))
-}
-
-getTargetLanguagesOf <- function(selectedLanguage, yearRange) {
-  df %>% 
-    filter(sourceLanguage == selectedLanguage & !is.na(targetLanguage)) %>% 
-    filterByDate(yearRange) %>% 
-    count(targetLanguage) %>% 
-    rename(language = targetLanguage) %>% 
-    arrange(desc(n))
-}
-
-getSourceAuthors <- function(selectedLanguage, yearRange) {
-  df %>% 
-    filter(sourceLanguage == selectedLanguage & !is.na(author)) %>% 
-    filterByDate(yearRange) %>% 
-    count(author) %>% 
-    arrange(desc(n))
-}
-
-getSourceCities <- function(selectedLanguage, yearRange) {
-  df1 <- df %>% 
-    filter(targetLanguage == selectedLanguage 
-           & !is.na(publicationPlace)) %>% 
-    filterByDate(yearRange) %>% 
-    count(publicationPlace) %>% 
-    arrange(desc(n))
-}
-
-getTargetCities <- function(selectedLanguage, yearRange) {
-  .df <- df %>% 
-    filter(sourceLanguage == selectedLanguage
-           & !is.na(publicationPlace)) %>% 
-    filterByDate(yearRange) %>% 
-    count(publicationPlace) %>% 
-    arrange(desc(n))
-}
-
-getTargetAuthors <- function(selectedLanguage, yearRange) {
-  df %>% 
-    filter(targetLanguage == selectedLanguage & !is.na(author)) %>% 
-    filterByDate(yearRange) %>% 
-    count(author) %>% 
-    arrange(desc(n)) %>% 
-    head(30)
-}
-
-getSourceByYear <- function(selectedLanguage, yearRange) {
-  df %>% 
-    filter(sourceLanguage == selectedLanguage & !is.na(publicationYear)) %>% 
-    filterByDate(yearRange) %>% 
-    count(publicationYear) %>% 
-    arrange(publicationYear)
-}
-
-getTargetByYear <- function(selectedLanguage, yearRange) {
-  df %>% 
-    filter(targetLanguage == selectedLanguage & !is.na(publicationYear)) %>% 
-    filterByDate(yearRange) %>% 
-    count(publicationYear) %>% 
-    arrange(publicationYear)
-}
-
-displayCities <- function(df1, selectedLanguage, direction) {
-  final <- df1 %>% 
-    left_join(coordDf, by = join_by(publicationPlace == city)) %>% 
-    filter(!is.na(publicationPlace)) %>%
-    filter(!(country %in% nonEuropeanCountries)) %>% 
-    select(publicationPlace, n, country, lat, long)
-  
-  map.europe <- map_data("world")
-  basemap <- ggplot() +
-    geom_polygon(
-      data = map.europe,
-      aes(x = long, y = lat, group = group),
-      fill = '#ffffff',
-      colour = '#999999'
-    ) +
-    # coord_cartesian(xlim = c(minx, maxx), ylim = c(miny, maxy)) +
-    coord_cartesian(xlim = c(-21,45), ylim = c(36,66)) +
-    theme_bw() +
-    theme(
-      legend.position = 'none',
-      axis.title = element_blank(),
-      axis.ticks = element_blank(),
-      axis.text = element_blank(),
-      # legend.title = element_text(size=rel(0.5)), 
-      # legend.text = element_text(size=rel(0.5))
-    ) +
-    labs(
-      title = sprintf('Publication places of books translated %s %s', direction, selectedLanguage)
-    )
-
-  basemap +
-    geom_point(
-      data = final,
-      aes(x = long, y = lat, size = n),
-      color = "red",
-      alpha = .8)
-}
-
-plotLanguages <- function(df1, direction, selectedLanguage, nature) {
-  df1 %>% 
-    ggplot(aes(x = fct_rev(
-      factor(language,
-             levels = language)),
-      y = n)) + 
-    geom_col() +
-    coord_flip() +
-    theme_bw() +
-    labs(
-      title = sprintf('Translations %s %s', direction, selectedLanguage),
-      x = sprintf('%s language', nature),
-      y = 'number of books'
-    )
-}
-
-plotByYear <- function(yearlyDf, direction, selectedLanguage) {
-  yearlyDf %>% 
-    ggplot(aes(x = publicationYear, y = n)) +
-    geom_line() +
-    theme_bw() +
-    labs(
-      title = sprintf('Translations %s %s', direction, selectedLanguage),
-      x = 'publicaton year',
-      y = 'number of books'
-    )
-}
-
-displaySourceCities <- function(selectedLanguage, yearRange) {
-  displayCities(getSourceCities(selectedLanguage, yearRange), selectedLanguage, 'to')
-}
-
-displayTargetCities <- function(selectedLanguage, yearRange) {
-  displayCities(getTargetCities(selectedLanguage, yearRange), selectedLanguage, 'from')
-}
-
-displayTargetLanguagesOf <- function(selectedLanguage, yearRange) {
-  plotLanguages(getTargetLanguagesOf(selectedLanguage, yearRange), 'from', selectedLanguage, 'target')
-}
-
-displaySourceLanguagesOf <- function(selectedLanguage, yearRange) {
-  plotLanguages(getSourceLanguagesOf(selectedLanguage, yearRange), 'to', selectedLanguage, 'source')
-}
-
-displaySourceByYear <- function(selectedLanguage, yearRange) {
-  plotByYear(getSourceByYear(selectedLanguage, yearRange), 'from', selectedLanguage)
-}
-
-displayTargetByYear <- function(selectedLanguage, yearRange) {
-  plotByYear(getTargetByYear(selectedLanguage, yearRange), 'to', selectedLanguage)
-}
-
-displayBoth <- function(selectedLanguage, yearRange) {
-  both <- getSourceByYear(selectedLanguage, yearRange) %>% 
-    full_join(
-      getTargetByYear(selectedLanguage, yearRange),
-      by = "publicationYear") %>% 
-    rename(from = n.x, to = n.y) %>% 
-    pivot_longer(!publicationYear,
-                 names_to = "direction",
-                 values_to = "count",
-                 values_drop_na = FALSE
-    ) %>% 
-    mutate(count = ifelse(is.na(count), 0, count))
-  
-  both %>% 
-    ggplot(aes(x = publicationYear, y = count, color = direction)) +
-    geom_line() +
-    theme_bw() +
-    labs(
-      title = sprintf('Translations to and from %s', selectedLanguage),
-      x = 'publicaton year',
-      y = 'number of books'
-    )
-}
+# languages <- dfDefault %>% count(sourceLanguage) %>% 
+#   arrange(desc(n)) %>% select(sourceLanguage) %>% unlist(use.names = FALSE)
+# print(languages)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -229,14 +34,9 @@ ui <- fluidPage(
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-      selectInput('language', label='Select a language', choices=languages),
-      sliderInput(
-        "rng", "Select publication year:",
-        min = min(publicationYears),
-        max = max(publicationYears),
-        value = c(min(publicationYears), max(publicationYears)),
-        sep = ""
-      ),
+      uiOutput("directory"),
+      uiOutput("languageSelector"),
+      uiOutput("rngSelector"),
       
       selectInput(
         'display',
@@ -270,7 +70,266 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
   
+  df2 <- reactive({
+    message(paste("directory2 is", input$directory2))
+    if (is.null(input$directory2)) {
+      dfDefault
+    } else {
+      read_csv(input$directory2)
+    }
+  })
+  
+  publicationYears <- reactive({
+    df2() %>% 
+      select(publicationYear) %>% 
+      filter(!is.na(publicationYear)) %>% 
+      distinct(publicationYear) %>% 
+      arrange(publicationYear) %>% 
+      unlist(use.name = FALSE)
+  })
+  
+  output$directory <- renderUI({
+    if (!is.null(directoryDf)) {
+      d <- directoryDf %>% select(label, output) %>% deframe()
+      message(d)
+      selectInput(
+        'directory2',
+        label='Select input', 
+        choices=d
+      )
+    }
+  })
+  
+  output$languageSelector <- renderUI({
+    languages <- df2() %>% count(sourceLanguage) %>% 
+      arrange(desc(n)) %>% 
+      select(sourceLanguage) %>% 
+      unlist(use.names = FALSE)
+    selectInput('language', label='Select a language', choices=languages)
+  })
+
+  output$rngSelector <- renderUI({
+    publicationYears <- publicationYears()
+
+    sliderInput(
+      "rng", "Select publication year:",
+      min = min(publicationYears),
+      max = max(publicationYears),
+      value = c(min(publicationYears), max(publicationYears)),
+      sep = ""
+    )
+  })
+  
+  filterByDate <- function(.df, yearRange) {
+    publicationYears <- publicationYears()
+    if (   min(publicationYears) < yearRange[1]
+           || max(publicationYears) > yearRange[1]) {
+      .df <- .df %>% 
+        filter(  !is.na(publicationYear) 
+                 & publicationYear >= yearRange[1] 
+                 & publicationYear <= yearRange[2])
+    }
+    .df
+  }
+  
+  # get data
+  getSourceLanguagesOf <- function(selectedLanguage, yearRange) {
+    message('getSourceLanguagesOf')
+    df2() %>% 
+      filter(targetLanguage == selectedLanguage & !is.na(sourceLanguage)) %>% 
+      filterByDate(yearRange) %>% 
+      count(sourceLanguage) %>% 
+      rename(language = sourceLanguage) %>% 
+      arrange(desc(n))
+  }
+  
+  getSourceAuthors <- function(selectedLanguage, yearRange) {
+    message('getSourceAuthors')
+    df2() %>% 
+      filter(sourceLanguage == selectedLanguage & !is.na(author)) %>% 
+      filterByDate(yearRange) %>% 
+      count(author) %>% 
+      arrange(desc(n))
+  }
+  
+  getSourceCities <- function(selectedLanguage, yearRange) {
+    message(sprintf('getSourceCities(%s, %s)', selectedLanguage, paste(yearRange, collapse = '—')))
+    df1 <- df2() %>% 
+      filter(targetLanguage == selectedLanguage 
+             & !is.na(publicationPlace)) %>% 
+      filterByDate(yearRange) %>% 
+      count(publicationPlace) %>% 
+      arrange(desc(n))
+  }
+  
+  getTargetCities <- function(selectedLanguage, yearRange) {
+    message('getTargetCities')
+    .df <- df2() %>% 
+      filter(sourceLanguage == selectedLanguage
+             & !is.na(publicationPlace)) %>% 
+      filterByDate(yearRange) %>% 
+      count(publicationPlace) %>% 
+      arrange(desc(n))
+  }
+  
+  getTargetAuthors <- function(selectedLanguage, yearRange) {
+    message('getTargetAuthors')
+    df2() %>% 
+      filter(targetLanguage == selectedLanguage & !is.na(author)) %>% 
+      filterByDate(yearRange) %>% 
+      count(author) %>% 
+      arrange(desc(n)) %>% 
+      head(30)
+  }
+  
+  getSourceByYear <- function(selectedLanguage, yearRange) {
+    message('getSourceByYear')
+    df2() %>% 
+      filter(sourceLanguage == selectedLanguage & !is.na(publicationYear)) %>% 
+      filterByDate(yearRange) %>% 
+      count(publicationYear) %>% 
+      arrange(publicationYear)
+  }
+  
+  getTargetByYear <- function(selectedLanguage, yearRange) {
+    message('getTargetByYear')
+    df2() %>% 
+      filter(targetLanguage == selectedLanguage & !is.na(publicationYear)) %>% 
+      filterByDate(yearRange) %>% 
+      count(publicationYear) %>% 
+      arrange(publicationYear)
+  }
+  
+  getTargetLanguagesOf <- function(selectedLanguage, yearRange) {
+    message('getTargetLanguagesOf')
+    df2() %>% 
+      filter(sourceLanguage == selectedLanguage & !is.na(targetLanguage)) %>%
+      filterByDate(yearRange) %>% 
+      count(targetLanguage) %>% 
+      rename(language = targetLanguage) %>% 
+      arrange(desc(n))
+  }
+  
+  displayCities <- function(df1, selectedLanguage, direction) {
+    final <- df1 %>% 
+      left_join(coordDf, by = join_by(publicationPlace == city)) %>% 
+      filter(!is.na(publicationPlace)) %>%
+      filter(!(country %in% nonEuropeanCountries)) %>% 
+      select(publicationPlace, n, country, lat, long)
+    
+    map.europe <- map_data("world")
+    basemap <- ggplot() +
+      geom_polygon(
+        data = map.europe,
+        aes(x = long, y = lat, group = group),
+        fill = '#ffffff',
+        colour = '#999999'
+      ) +
+      # coord_cartesian(xlim = c(minx, maxx), ylim = c(miny, maxy)) +
+      coord_cartesian(xlim = c(-21,45), ylim = c(36,66)) +
+      theme_bw() +
+      theme(
+        legend.position = 'none',
+        axis.title = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_blank(),
+        # legend.title = element_text(size=rel(0.5)), 
+        # legend.text = element_text(size=rel(0.5))
+      ) +
+      labs(
+        title = sprintf('Publication places of books translated %s %s', direction, selectedLanguage)
+      )
+    
+    basemap +
+      geom_point(
+        data = final,
+        aes(x = long, y = lat, size = n),
+        color = "red",
+        alpha = .8)
+  }
+  
+  plotLanguages <- function(df1, direction, selectedLanguage, nature) {
+    df1 %>% 
+      ggplot(aes(x = fct_rev(
+        factor(language,
+               levels = language)),
+        y = n)) + 
+      geom_col() +
+      coord_flip() +
+      theme_bw() +
+      labs(
+        title = sprintf('Translations %s %s', direction, selectedLanguage),
+        x = sprintf('%s language', nature),
+        y = 'number of books'
+      )
+  }
+  
+  plotByYear <- function(yearlyDf, direction, selectedLanguage) {
+    yearlyDf %>% 
+      ggplot(aes(x = publicationYear, y = n)) +
+      geom_line() +
+      theme_bw() +
+      labs(
+        title = sprintf('Translations %s %s', direction, selectedLanguage),
+        x = 'publicaton year',
+        y = 'number of books'
+      )
+  }
+  
+  
+  displayTargetLanguagesOf <- function(selectedLanguage, yearRange) {
+    message('displayTargetLanguagesOf')
+    plotLanguages(getTargetLanguagesOf(selectedLanguage, yearRange), 'from', selectedLanguage, 'target')
+  }
+  
+  displaySourceCities <- function(selectedLanguage, yearRange) {
+    message(sprintf('displaySourceCities(%s, %s)', selectedLanguage, paste(yearRange, collapse = '—')))
+    displayCities(getSourceCities(selectedLanguage, yearRange), selectedLanguage, 'to')
+  }
+  
+  displayTargetCities <- function(selectedLanguage, yearRange) {
+    message(sprintf('displayTargetCities(%s, %s)', selectedLanguage, paste(yearRange, collapse = '—')))
+    displayCities(getTargetCities(selectedLanguage, yearRange), selectedLanguage, 'from')
+  }
+  
+  displaySourceLanguagesOf <- function(selectedLanguage, yearRange) {
+    plotLanguages(getSourceLanguagesOf(selectedLanguage, yearRange), 'to', selectedLanguage, 'source')
+  }
+  
+  displaySourceByYear <- function(selectedLanguage, yearRange) {
+    plotByYear(getSourceByYear(selectedLanguage, yearRange), 'from', selectedLanguage)
+  }
+  
+  displayTargetByYear <- function(selectedLanguage, yearRange) {
+    plotByYear(getTargetByYear(selectedLanguage, yearRange), 'to', selectedLanguage)
+  }
+  
+  displayBoth <- function(selectedLanguage, yearRange) {
+    both <- getSourceByYear(selectedLanguage, yearRange) %>% 
+      full_join(
+        getTargetByYear(selectedLanguage, yearRange),
+        by = "publicationYear") %>% 
+      rename(from = n.x, to = n.y) %>% 
+      pivot_longer(!publicationYear,
+                   names_to = "direction",
+                   values_to = "count",
+                   values_drop_na = FALSE
+      ) %>% 
+      mutate(count = ifelse(is.na(count), 0, count))
+    
+    both %>% 
+      ggplot(aes(x = publicationYear, y = count, color = direction)) +
+      geom_line() +
+      theme_bw() +
+      labs(
+        title = sprintf('Translations to and from %s', selectedLanguage),
+        x = 'publicaton year',
+        y = 'number of books'
+      )
+  }
+  
   output$distPlot <- renderPlot({
+    message(sprintf('#render distPlot for %s: %s', input$display, input$language))
     plot <- NULL
     if (input$display == 'targetLanguages') {
       plot <- displayTargetLanguagesOf(input$language, input$rng)
@@ -291,6 +350,7 @@ server <- function(input, output, session) {
   }, res = 96)
   
   output$authors <- renderText({
+    message('#render authors')
     authors <- NULL
     if (input$display %in% c('targetLanguages', 'sourceByYear', 'targetCities')) {
       authors <- getSourceAuthors(input$language, input$rng)
@@ -312,6 +372,7 @@ server <- function(input, output, session) {
   })
 
   output$cities <- renderText({
+    message('#render cities')
     cities <- NULL
     if (input$display %in% c('targetLanguages', 'sourceByYear', 'sourceCities')) {
       cities <- getSourceCities(input$language, input$rng)
@@ -330,10 +391,11 @@ server <- function(input, output, session) {
   })
 
   output$languages <- renderText({
+    message(sprintf('#render languages for %s -- %s', input$language, input$display))
     cities <- NULL
-    if (input$display %in% c('targetLanguages', 'sourceByYear', 'sourceCities')) {
+    if (input$display %in% c('sourceLanguages', 'sourceByYear', 'sourceCities')) {
       cities <- getSourceLanguagesOf(input$language, input$rng)
-    } else if (input$display %in% c('sourceLanguages', 'targetByYear', 'targetCities')) {
+    } else if (input$display %in% c('targetLanguages', 'targetByYear', 'targetCities')) {
       cities <- getTargetLanguagesOf(input$language, input$rng)
     } else {
       print("does not match")
