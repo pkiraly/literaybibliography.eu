@@ -1,6 +1,15 @@
 <?php
 
-$input = '/home/pkiraly/data/marc21/output/elb/translations-export.jsonld';
+$config_file = 'configuration.cnf';
+if (!file_exists($config_file))
+  die("There should be a configuration file 'configuration.cnf' but it is missing!\n");
+
+$configuration = @parse_ini_file($config_file, false, INI_SCANNER_TYPED);
+if (!$configuration) {
+  die("Failed to read config file!");
+}
+
+$input = $configuration['qa_output'] . '/elb/translations-export.jsonld';
 $output = 'data/translations-export.csv';
 if (file_exists($output))
   unlink($output);
