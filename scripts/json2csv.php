@@ -1,4 +1,7 @@
 <?php
+/**
+ * Transform QA_OUTPUT/DIR/translations-export.jsonld to data/DIR-translations.csv
+ */
 
 $config_file = 'configuration.cnf';
 if (!file_exists($config_file))
@@ -28,7 +31,7 @@ if (isset($options["l"]) || isset($options["label"])) {
 echo 'directory: ', $directory, "\n";
 echo 'label: ', $label, "\n";
 
-$input = $configuration['qa_output'] . '/' . $directory .'/translations-export.jsonld';
+$input = $configuration['qa_output'] . '/' . $directory . '/translations-export.jsonld';
 $output = 'data/' . $directory . '-translations.csv';
 echo 'output: ', $output, "\n";
 if (file_exists($output))
