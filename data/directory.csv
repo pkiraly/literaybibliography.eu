@@ -1,0 +1,6 @@
+machine_name,label,output
+elb,"European Literary Bibliography",data/elb-translations.csv
+boslit,"Books of Scottish Literature in Translation",data/boslit-translations.csv
+oszk,"Országos Széchényi Könyvtár",data/oszk-translations.csv
+bnpl,"Biblioteka Narodowa (Polish National Library)",data/bnpl-translations.csv
+kbr,"KBR",data/kbr-translations.csv
